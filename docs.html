@@ -1,0 +1,447 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Docs</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/styles/github.min.css">
+  <style>
+    :root { --accent:#1f4eff; --border:#e5e7eb; --muted:#6b7280; --bg:#ffffff; --sidebar:#f7f7f8; }
+    * { box-sizing: border-box; }
+    html, body { height: 100%; }
+    body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji"; color:#0f172a; background: var(--bg); overscroll-behavior: none; }
+    #upload-view { min-height: 100vh; display: grid; place-items: center; padding: 24px; }
+    .upload-card { width: 100%; max-width: 640px; border:1px solid var(--border); border-radius: 12px; padding: 24px; background:#fff; }
+    .upload-title { margin: 0 0 8px 0; font-size: 24px; }
+    .upload-sub { margin: 0 0 16px 0; color: var(--muted); }
+    .row { display:flex; gap:12px; align-items:center; }
+    input[type="file"] { flex:1; }
+    button { appearance:none; border:1px solid var(--border); background:#fff; padding:10px 14px; border-radius:10px; cursor:pointer; }
+    button.primary { background: var(--accent); color:#fff; border-color: var(--accent); }
+    .error { margin-top: 10px; color:#b91c1c; min-height: 1.2em; }
+    #docs-view { display:none; min-height: 100vh; }
+    .layout { display:flex; min-height:100vh; }
+    aside { width: 260px; background: var(--sidebar); border-right:1px solid var(--border); padding: 16px; display:flex; flex-direction:column; gap:8px; position: sticky; top: 0; height: 100vh; overflow:auto; overscroll-behavior: contain; }
+    .brand { font-weight:600; margin:4px 8px 12px 8px; }
+    .nav-item { border:0; background: transparent; text-align:left; padding:8px 10px; border-radius:8px; cursor:pointer; color:#0f172a; }
+    .nav-item:hover { background:#eef2ff; }
+    .nav-item.active { background:#e8eefb; color: var(--accent); }
+    main { flex:1; padding: 24px; }
+    .page-title { margin: 0 0 8px 0; font-size:28px; }
+    .description { margin: 8px 0 12px 0; color:#111827; white-space: pre-wrap; line-height: 1.6; }
+    .tabs { display:flex; gap:8px; margin: 16px 0 12px 0; flex-wrap: wrap; }
+    .tab { padding:6px 12px; border:1px solid var(--border); border-radius:8px; background:#f8fafc; cursor:pointer; color:#0f172a; }
+    .tab:hover { background:#eef2ff; }
+    .tab.active { background: var(--accent); color:#fff; border-color: var(--accent); }
+    .code-cell { background:#fff; border:1px solid var(--border); border-radius:10px; }
+    .code-cell pre { background: #f8fafc; border:0; border-radius:10px; margin: 0; padding: 14px; }
+    pre { border:1px solid var(--border); border-radius:10px; padding: 14px; overflow:auto; background:#f8fafc; }
+    pre::-webkit-scrollbar, .code-cell::-webkit-scrollbar, body::-webkit-scrollbar, aside::-webkit-scrollbar, main::-webkit-scrollbar { width:0; height:0; }
+    pre, .code-cell, body, aside, main { scrollbar-width: none; }
+    .hljs { background: transparent; }
+    .prose p { margin: 0 0 12px 0; line-height:1.8; color:#111827; }
+    .prose h2 { font-size:20px; margin: 20px 0 8px 0; }
+    .section { margin: 24px 0; }
+    .endpoint-title { display:flex; align-items:center; gap:10px; font-size:18px; margin: 24px 0 8px 0; }
+    .method-badge { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; font-size:12px; padding:2px 6px; border-radius:6px; border:1px solid var(--border); background:#eef2ff; color:#1f2937; }
+    .path { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; color:#334155; }
+  </style>
+</head>
+<body>
+  <div id="upload-view">
+    <div class="upload-card">
+      <h1 class="upload-title">Build Docs from JSON</h1>
+      <p class="upload-sub">Upload a JSON file containing pages and code snippets.</p>
+      <div class="row">
+        <input id="jsonFile" type="file" accept=".json,application/json">
+        <button id="loadBtn" class="primary">Load</button>
+      </div>
+      <div id="error" class="error"></div>
+    </div>
+  </div>
+
+  <div id="docs-view">
+    <div class="layout">
+      <aside>
+        <div class="brand">Docs</div>
+        <div id="sidebar"></div>
+      </aside>
+      <main>
+        <div id="content"></div>
+      </main>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/highlight.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/languages/python.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/languages/bash.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/languages/json.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/languages/javascript.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/languages/typescript.min.js"></script>
+  <script>
+    const state = { pages: [], currentIndex: 0 };
+    const el = id => document.getElementById(id);
+    const setError = msg => { const e = el('error'); e.textContent = msg || ''; };
+    const languageMeta = k => {
+      const key = String(k || '').toLowerCase();
+      if (key === 'python' || key === 'py') return { label: 'Python', hljs: 'python' };
+      if (key === 'curl') return { label: 'cURL', hljs: 'bash' };
+      if (key === 'bash' || key === 'sh' || key === 'shell') return { label: 'Bash', hljs: 'bash' };
+      if (key === 'javascript' || key === 'js' || key === 'node') return { label: 'JavaScript', hljs: 'javascript' };
+      if (key === 'typescript' || key === 'ts') return { label: 'TypeScript', hljs: 'typescript' };
+      if (key === 'json') return { label: 'JSON', hljs: 'json' };
+      return { label: k, hljs: key };
+    };
+    const toArray = v => Array.isArray(v) ? v : (v === undefined || v === null ? [] : [v]);
+    const extractParagraphs = value => {
+      const out = [];
+      const add = t => { if (t && String(t).trim()) out.push(String(t).trim()); };
+      if (typeof value === 'string') {
+        value.split(/\n\s*\n/).forEach(add);
+      } else if (Array.isArray(value)) {
+        value.forEach(v => extractParagraphs(v).forEach(p => out.push(p)));
+      } else if (value && typeof value === 'object') {
+        const ps = value.paragraphs ?? value.body ?? value.description ?? value.content ?? value.text;
+        extractParagraphs(ps).forEach(p => out.push(p));
+        const sections = value.sections ?? value.blocks ?? value.items;
+        toArray(sections).forEach(s => extractParagraphs(s).forEach(p => out.push(p)));
+      } else if (value != null) {
+        add(String(value));
+      }
+      return out;
+    };
+    const normalizeCodes = input => {
+      const codes = [];
+      if (!input) return codes;
+      if (typeof input === 'string') {
+        codes.push({ label: 'Text', hljs: 'plaintext', code: input });
+        return codes;
+      }
+      if (Array.isArray(input)) {
+        input.forEach(item => {
+          if (!item) return;
+          const lang = item.language ?? item.lang ?? item.type ?? item.name;
+          const src = item.code ?? item.snippet ?? item.text ?? item.content ?? item.example;
+          if (src !== undefined) {
+            const meta = languageMeta(lang || 'text');
+            codes.push({ label: meta.label, hljs: meta.hljs, code: typeof src === 'string' ? src : JSON.stringify(src, null, 2) });
+          } else if (typeof item === 'string') {
+            codes.push({ label: 'Text', hljs: 'plaintext', code: item });
+          }
+        });
+        return codes;
+      }
+      if (typeof input === 'object') {
+        const map = input.code_snippet ?? input.codeSnippet ?? input.snippets ?? input.examples ?? input;
+        Object.entries(map).forEach(([lang, src]) => {
+          let codeText = '';
+          if (typeof src === 'string') codeText = src;
+          else if (Array.isArray(src)) codeText = src.map(v => typeof v === 'string' ? v : JSON.stringify(v, null, 2)).join('\n');
+          else if (src && typeof src === 'object') codeText = src.code ?? src.snippet ?? src.text ?? src.content ?? JSON.stringify(src, null, 2);
+          else if (src != null) codeText = String(src);
+          const meta = languageMeta(lang);
+          codes.push({ label: meta.label, hljs: meta.hljs, code: codeText });
+        });
+        return codes;
+      }
+      return codes;
+    };
+    const normalizeSections = raw => {
+      const sections = [];
+      const arr = toArray(raw);
+      arr.forEach(item => {
+        if (!item) return;
+        if (typeof item === 'string') {
+          sections.push({ heading: undefined, paragraphs: extractParagraphs(item), codes: [] });
+          return;
+        }
+        if (Array.isArray(item)) {
+          sections.push({ heading: undefined, paragraphs: extractParagraphs(item), codes: [] });
+          return;
+        }
+        if (typeof item === 'object') {
+          const heading = item.heading ?? item.title ?? item.name;
+          const paragraphs = extractParagraphs(item);
+          const codes = normalizeCodes(item.code ?? item.code_snippet ?? item.codeSnippet ?? item.snippets ?? item.examples);
+          sections.push({ heading, paragraphs, codes });
+          if (Array.isArray(item.endpoints)) {
+            item.endpoints.forEach(ep => {
+              if (!ep) return;
+              const method = (ep.method || '').toUpperCase();
+              const path = ep.path ?? ep.url ?? ep.endpoint;
+              const name = ep.name ?? ep.title;
+              const epHeading = [method, path].filter(Boolean).join(' ');
+              const fullHeading = name ? (epHeading ? epHeading + ' – ' + name : name) : epHeading || undefined;
+              const epParagraphs = extractParagraphs(ep.description ?? ep.body ?? ep.overview ?? ep.docs ?? ep.text);
+              const epCodes = normalizeCodes(ep.examples ?? ep.code ?? ep.code_snippet ?? ep.codeSnippet ?? ep.snippets);
+              sections.push({ heading: fullHeading, paragraphs: epParagraphs, codes: epCodes, method, path });
+            });
+          }
+        }
+      });
+      return sections;
+    };
+    const normalizeContentBlocks = (blocks, pageTitle) => {
+      const sections = [];
+      let current = null;
+      const ensureCurrent = () => {
+        if (!current) {
+          current = { heading: pageTitle || undefined, paragraphs: [], codes: [] };
+          sections.push(current);
+        }
+      };
+      const flushParaBuffer = buffer => {
+        const text = buffer.join('\n').trim();
+        if (!text) return;
+        const parts = text.split(/\n\s*\n/).map(s => s.trim()).filter(Boolean);
+        parts.forEach(t => current.paragraphs.push(t));
+      };
+      if (!Array.isArray(blocks)) return sections;
+      blocks.forEach(block => {
+        if (!block) return;
+        if (block.type === 'text' && typeof block.value === 'string') {
+          const lines = block.value.split(/\r?\n/);
+          let buffer = [];
+          let foundHeading = false;
+          lines.forEach(line => {
+            const m = line.match(/^##\s*(.+)$/);
+            if (m) {
+              if (current && buffer.length) flushParaBuffer(buffer);
+              buffer = [];
+              foundHeading = true;
+              current = { heading: m[1].trim(), paragraphs: [], codes: [] };
+              sections.push(current);
+              return;
+            }
+            if (!current) ensureCurrent();
+            if (line.trim() === '') {
+              flushParaBuffer(buffer);
+              buffer = [];
+            } else {
+              buffer.push(line);
+            }
+          });
+          if (!current) ensureCurrent();
+          if (buffer.length) flushParaBuffer(buffer);
+          if (!foundHeading && !pageTitle && !current.heading && current.paragraphs.length === 0) current.heading = undefined;
+          return;
+        }
+        if (block.type === 'code_snippet' && block.languages && typeof block.languages === 'object') {
+          if (!current) ensureCurrent();
+          const codes = normalizeCodes(block.languages);
+          codes.forEach(c => current.codes.push(c));
+          return;
+        }
+      });
+      return sections;
+    };
+    const normalizePage = (title, description, codeBlock, extra = {}) => {
+      const codes = [];
+      normalizeCodes(codeBlock).forEach(c => codes.push(c));
+      const sections = normalizeSections(extra.sections ?? extra.blocks ?? extra.items ?? extra.endpoints);
+      return { title: title || 'Untitled', description: description ?? '', codes, sections };
+    };
+    const normalizeInput = data => {
+      const source = data && (data.pages ?? data);
+      const pages = [];
+      if (Array.isArray(source)) {
+        const hasContentBlocks = source.some(p => p && Array.isArray(p.content));
+        if (hasContentBlocks) {
+          const combinedSections = [];
+          source.forEach(item => {
+            if (!item) return;
+            const title = item.title ?? item.name ?? item.key;
+            const headerSection = { heading: title || undefined, paragraphs: [], codes: [] };
+            combinedSections.push(headerSection);
+            const contentSections = normalizeContentBlocks(item.content || [], undefined);
+            contentSections.forEach(sec => combinedSections.push(sec));
+          });
+          pages.push({ title: 'API Documentation', description: '', codes: [], sections: combinedSections });
+        } else {
+          source.forEach(item => {
+            const title = item && (item.title ?? item.name ?? item.key);
+            const description = item && (item.description ?? item.overview ?? item.intro ?? item.content ?? item.text ?? '');
+            const code = item && (item.code_snippet ?? item.codeSnippet ?? item.code ?? item.snippets ?? item.examples ?? {});
+            pages.push(normalizePage(title, description, code, item));
+          });
+        }
+      } else if (source && typeof source === 'object') {
+        Object.entries(source).forEach(([key, value]) => {
+          let description = '';
+          let code = {};
+          if (Array.isArray(value)) {
+            description = value[0] ?? '';
+            const second = value[1];
+            if (second && typeof second === 'object') code = second.code_snippet ?? second.codeSnippet ?? second.code ?? second;
+          } else if (value && typeof value === 'object') {
+            description = value.description ?? value.overview ?? value.intro ?? value.content ?? value.text ?? '';
+            code = value.code_snippet ?? value.codeSnippet ?? value.code ?? value.snippets ?? value.examples ?? {};
+          } else if (value != null) {
+            description = String(value);
+          }
+          pages.push(normalizePage(key, description, code, value && typeof value === 'object' ? value : {}));
+        });
+      }
+      return pages;
+    };
+    const buildSidebar = () => {
+      const sb = el('sidebar');
+      sb.innerHTML = '';
+      state.pages.forEach((p, i) => {
+        const b = document.createElement('button');
+        b.className = 'nav-item' + (i === state.currentIndex ? ' active' : '');
+        b.textContent = p.title;
+        b.addEventListener('click', () => activate(i));
+        sb.appendChild(b);
+      });
+    };
+    const renderPage = index => {
+      const container = el('content');
+      container.innerHTML = '';
+      const page = state.pages[index];
+      const h = document.createElement('h1');
+      h.className = 'page-title';
+      h.textContent = page.title;
+      container.appendChild(h);
+      if (page.description !== undefined && page.description !== null) {
+        const d = document.createElement('div');
+        d.className = 'description prose';
+        const renderParagraphs = value => {
+          if (typeof value === 'string') {
+            const chunks = value.split(/\n\s*\n/).map(s => s.trim()).filter(Boolean);
+            chunks.forEach(text => {
+              const p = document.createElement('p');
+              p.textContent = text;
+              d.appendChild(p);
+            });
+            return;
+          }
+          if (Array.isArray(value)) {
+            value.forEach(v => renderParagraphs(v));
+            return;
+          }
+          if (value && typeof value === 'object') {
+            const t = value.title ?? value.heading;
+            const ps = value.paragraphs ?? value.description ?? value.content ?? value.text;
+            if (t) {
+              const h = document.createElement('h2');
+              h.textContent = t;
+              d.appendChild(h);
+            }
+            if (ps !== undefined) renderParagraphs(ps);
+            const sections = value.sections ?? value.blocks;
+            if (Array.isArray(sections)) sections.forEach(s => renderParagraphs(s));
+            return;
+          }
+          const p = document.createElement('p');
+          p.textContent = String(value);
+          d.appendChild(p);
+        };
+        renderParagraphs(page.description);
+        container.appendChild(d);
+      }
+      const renderCodeTabs = (host, codes) => {
+        if (!codes || !codes.length) return;
+        const tabs = document.createElement('div');
+        tabs.className = 'tabs';
+        const blocks = document.createElement('div');
+        codes.forEach((c, i) => {
+          const t = document.createElement('button');
+          t.className = 'tab' + (i === 0 ? ' active' : '');
+          t.textContent = c.label;
+          t.addEventListener('click', () => {
+            const prev = tabs.querySelector('.tab.active');
+            if (prev) prev.classList.remove('active');
+            t.classList.add('active');
+            [...blocks.children].forEach((child, j) => child.style.display = j === i ? 'block' : 'none');
+          });
+          tabs.appendChild(t);
+          const cell = document.createElement('div');
+          cell.className = 'code-cell';
+          const pre = document.createElement('pre');
+          pre.style.display = i === 0 ? 'block' : 'none';
+          const code = document.createElement('code');
+          code.className = 'language-' + c.hljs;
+          code.textContent = c.code;
+          pre.appendChild(code);
+          cell.appendChild(pre);
+          blocks.appendChild(cell);
+        });
+        host.appendChild(tabs);
+        host.appendChild(blocks);
+        blocks.querySelectorAll('code').forEach(e => hljs.highlightElement(e));
+      };
+      if (page.codes && page.codes.length) renderCodeTabs(container, page.codes);
+      if (page.sections && page.sections.length) {
+        page.sections.forEach(sec => {
+          const s = document.createElement('section');
+          s.className = 'section prose';
+          if (sec.method || sec.path || sec.heading) {
+            const h = document.createElement('div');
+            h.className = 'endpoint-title';
+            if (sec.method) {
+              const m = document.createElement('span');
+              m.className = 'method-badge';
+              m.textContent = sec.method;
+              h.appendChild(m);
+            }
+            const t = document.createElement('span');
+            t.className = 'path';
+            t.textContent = sec.path ? (sec.heading ? sec.path : sec.path) : (sec.heading || '');
+            h.appendChild(t);
+            if (!sec.path && sec.heading) {
+              t.textContent = sec.heading;
+            } else if (sec.path && sec.heading && sec.heading.includes('–')) {
+              const extra = document.createElement('span');
+              extra.textContent = ' ' + sec.heading.split('–').slice(1).join('–').trim();
+              h.appendChild(extra);
+            }
+            s.appendChild(h);
+          }
+          toArray(sec.paragraphs).forEach(pText => {
+            const p = document.createElement('p');
+            p.textContent = pText;
+            s.appendChild(p);
+          });
+          renderCodeTabs(s, sec.codes);
+          s.querySelectorAll('code').forEach(e => hljs.highlightElement(e));
+          container.appendChild(s);
+        });
+      }
+    };
+    const activate = i => {
+      state.currentIndex = i;
+      renderPage(i);
+      const items = el('sidebar').querySelectorAll('.nav-item');
+      items.forEach((n, idx) => {
+        if (idx === i) n.classList.add('active'); else n.classList.remove('active');
+      });
+    };
+    el('loadBtn').addEventListener('click', () => {
+      const f = el('jsonFile').files[0];
+      if (!f) { setError('Select a JSON file'); return; }
+      const r = new FileReader();
+      r.onload = e => {
+        try {
+          const data = JSON.parse(e.target.result);
+          const pages = normalizeInput(data);
+          if (!pages.length) { setError('No pages found in JSON'); return; }
+          state.pages = pages;
+          state.currentIndex = 0;
+          el('upload-view').style.display = 'none';
+          el('docs-view').style.display = 'block';
+          buildSidebar();
+          renderPage(0);
+          setError('');
+        } catch (err) {
+          setError('Invalid JSON');
+        }
+      };
+      r.onerror = () => setError('Failed to read file');
+      r.readAsText(f);
+    });
+  </script>
+</body>
+</html>
+
+

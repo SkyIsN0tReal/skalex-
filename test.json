@@ -1,0 +1,77 @@
+{
+    "pages": [
+      {
+        "title": "Authentication",
+        "content": [
+          {
+            "type": "text",
+            "value": "The API uses a multi-step AWS authentication flow to secure requests. You must first obtain an identity token from Amazon Cognito, then use that token to assume a role via the AWS Security Token Service (STS) to get temporary API credentials."
+          },
+          {
+            "type": "text",
+            "value": "Step 1: Get an Identity ID from AWS Cognito. Make a POST request to the Cognito identity endpoint with your Identity Pool ID."
+          },
+          {
+            "type": "code_snippet",
+            "languages": {
+              "cURL": "curl -X POST 'https://cognito-identity.us-east-1.amazonaws.com/' \\\n-H 'Content-Type: application/x-amz-json-1.1' \\\n-d '{\"IdentityPoolId\":\"us-east-1:b1d823b0-f51e-47c3-80b3-30a26836fea5\"}'",
+              "python": "import requests\n\nurl = \"https://cognito-identity.us-east-1.amazonaws.com/\"\nheaders = {\"Content-Type\": \"application/x-amz-json-1.1\"}\npayload = {\"IdentityPoolId\": \"us-east-1:b1d823b0-f51e-47c3-80b3-30a26836fea5\"}\n\nresponse = requests.post(url, headers=headers, json=payload)\nprint(response.json())"
+            }
+          },
+          {
+            "type": "text",
+            "value": "Step 2: Assume a Role with AWS STS. Use the Web Identity Token obtained from the previous steps to request temporary credentials. This provides the Access Key, Secret Key, and Session Token needed to authorize subsequent API calls."
+          },
+          {
+            "type": "code_snippet",
+            "languages": {
+              "cURL": "curl -X POST 'https://sts.us-east-1.amazonaws.com/' \\\n-H 'Content-Type: application/x-www-form-urlencoded' \\\n-d 'RoleArn=arn%3Aaws%3Aiam%3A%3A960725147817%3Arole%2Feqb-rum-prod-role&RoleSessionName=cwr&WebIdentityToken=YOUR_WEB_IDENTITY_TOKEN&Action=AssumeRoleWithWebIdentity&Version=2011-06-15'",
+              "javascript": "const params = new URLSearchParams();\nparams.append('RoleArn', 'arn:aws:iam::960725147817:role/eqb-rum-prod-role');\nparams.append('RoleSessionName', 'cwr');\nparams.append('WebIdentityToken', 'YOUR_WEB_IDENTITY_TOKEN');\nparams.append('Action', 'AssumeRoleWithWebIdentity');\nparams.append('Version', '2011-06-15');\n\nfetch('https://sts.us-east-1.amazonaws.com/', {\n  method: 'POST',\n  headers: {\n    'Content-Type': 'application/x-www-form-urlencoded'\n  },\n  body: params\n});"
+            }
+          }
+        ]
+      },
+      {
+        "title": "Endpoints",
+        "content": [
+          {
+            "type": "text",
+            "value": "This section describes the available API endpoints for the SAT Suite Question Bank. The base URL for all endpoints is `https://qbank-api.collegeboard.org/msreportingquestionbank-prod/questionbank/`."
+          },
+          {
+            "type": "text",
+            "value": "## Get Lookup Data\n\nRetrieves metadata used for filtering questions, such as available assessments, tests, domains, and skills."
+          },
+          {
+            "type": "code_snippet",
+            "languages": {
+              "cURL": "curl 'https://qbank-api.collegeboard.org/msreportingquestionbank-prod/questionbank/lookup'",
+              "python": "import requests\n\nurl = 'https://qbank-api.collegeboard.org/msreportingquestionbank-prod/questionbank/lookup'\nresponse = requests.get(url)\nprint(response.json())"
+            }
+          },
+          {
+            "type": "text",
+            "value": "## Get All Questions by Filter\n\nFetches a list of questions based on specified filter criteria such as assessment event, test, and domain."
+          },
+          {
+            "type": "code_snippet",
+            "languages": {
+              "cURL": "curl -X POST 'https://qbank-api.collegeboard.org/msreportingquestionbank-prod/questionbank/digital/get-questions' \\\n-H 'Content-Type: application/json' \\\n-d '{\"asmtEventId\":99,\"test\":2,\"domain\":\"P\"}'",
+              "javascript": "fetch('https://qbank-api.collegeboard.org/msreportingquestionbank-prod/questionbank/digital/get-questions', {\n  method: 'POST',\n  headers: {\n    'Content-Type': 'application/json'\n  },\n  body: JSON.stringify({\n    asmtEventId: 99, // SAT\n    test: 2,         // Math\n    domain: 'P'      // Advanced Math\n  })\n}).then(res => res.json());"
+            }
+          },
+          {
+            "type": "text",
+            "value": "## Get a Single Question\n\nRetrieves detailed information, including rationale and answer keys, for a specific question using its external ID."
+          },
+          {
+            "type": "code_snippet",
+            "languages": {
+              "cURL": "curl -X POST 'https://qbank-api.collegeboard.org/msreportingquestionbank-prod/questionbank/digital/get-question' \\\n-H 'Content-Type: application/json' \\\n-d '{\"external_id\":\"abfd9618-c65d-4fd8-9f89-254e3dfa9529\"}'",
+              "python": "import requests\n\nurl = 'https://qbank-api.collegeboard.org/msreportingquestionbank-prod/questionbank/digital/get-question'\npayload = {\"external_id\": \"abfd9618-c65d-4fd8-9f89-254e3dfa9529\"}\n\nresponse = requests.post(url, json=payload)\nprint(response.json())"
+            }
+          }
+        ]
+      }
+    ]
+  }
