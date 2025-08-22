@@ -247,16 +247,23 @@
       if (Array.isArray(source)) {
         const hasContentBlocks = source.some(p => p && Array.isArray(p.content));
         if (hasContentBlocks) {
-          const combinedSections = [];
           source.forEach(item => {
             if (!item) return;
             const title = item.title ?? item.name ?? item.key;
-            const headerSection = { heading: title || undefined, paragraphs: [], codes: [] };
-            combinedSections.push(headerSection);
-            const contentSections = normalizeContentBlocks(item.content || [], undefined);
-            contentSections.forEach(sec => combinedSections.push(sec));
+            const sections = normalizeContentBlocks(item.content || [], title);
+            if (!sections.length) {
+              pages.push({ title: title || 'Untitled', description: item.description ?? '', codes: [], sections: [] });
+            } else {
+              sections.forEach(sec => {
+                pages.push({
+                  title: sec.heading || title || 'Untitled',
+                  description: sec.paragraphs,
+                  codes: sec.codes,
+                  sections: []
+                });
+              });
+            }
           });
-          pages.push({ title: 'API Documentation', description: '', codes: [], sections: combinedSections });
         } else {
           source.forEach(item => {
             const title = item && (item.title ?? item.name ?? item.key);
@@ -354,12 +361,16 @@
             if (prev) prev.classList.remove('active');
             t.classList.add('active');
             [...blocks.children].forEach((child, j) => child.style.display = j === i ? 'block' : 'none');
+            const activeCode = blocks.children[i]?.querySelector('code');
+            if (activeCode && !activeCode.classList.contains('hljs')) {
+              hljs.highlightElement(activeCode);
+            }
           });
           tabs.appendChild(t);
           const cell = document.createElement('div');
           cell.className = 'code-cell';
+          cell.style.display = i === 0 ? 'block' : 'none';
           const pre = document.createElement('pre');
-          pre.style.display = i === 0 ? 'block' : 'none';
           const code = document.createElement('code');
           code.className = 'language-' + c.hljs;
           code.textContent = c.code;
