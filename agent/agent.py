@@ -4,6 +4,7 @@ import subprocess
 import sys
 import tempfile
 import threading
+import time
 from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
 from openai import OpenAI
@@ -70,8 +71,8 @@ def serve_frontend():
 @app.route('/chat', methods=['POST'])
 def chat():
     try:
-        data = request.json
-        user_message = data.get('message', '').strip()
+        data = request.get_json(silent=True) or {}
+        user_message = str(data.get('message', '')).strip()
         session_id = data.get('session_id', 'default')
         
         if not user_message:
@@ -85,82 +86,104 @@ def chat():
             "content": [{"type": "input_text", "text": user_message}]
         })
         
-        response = client.responses.create(
-            model="gpt-4.1",
-            input=message_history,
-            text={"format": {"type": "text"}},
-            reasoning={},
-            tools=[
-                {
-                    "type": "function",
-                    "name": "run_python_code",
-                    "description": "Execute a given Python code snippet and return the result.",
-                    "parameters": {
-                        "type": "object",
-                        "properties": {
-                            "code": {
-                                "type": "string",
-                                "description": "Python code to execute"
-                            }
+        timeline = []
+        timeline.append({"t": time.time(), "type": "user_message", "data": user_message})
+        
+        max_tool_iterations = 5
+        final_response_text = None
+        last_executed_code = None
+        last_execution_result = None
+
+        for _ in range(max_tool_iterations):
+            response = client.responses.create(
+                model="gpt-4.1",
+                input=message_history,
+                text={"format": {"type": "text"}},
+                reasoning={},
+                tools=[
+                    {
+                        "type": "function",
+                        "name": "run_python_code",
+                        "description": "Execute a given Python code snippet and return the result.",
+                        "parameters": {
+                            "type": "object",
+                            "properties": {
+                                "code": {
+                                    "type": "string",
+                                    "description": "Python code to execute"
+                                }
+                            },
+                            "required": ["code"],
+                            "additionalProperties": False
                         },
-                        "required": ["code"],
-                        "additionalProperties": False
-                    },
-                    "strict": True
-                }
-            ],
-            temperature=1,
-            max_output_tokens=2048,
-            top_p=1,
-            store=True
-        )
-        
-        dictionary = response.model_dump()
-        
-        try:
-            function_call_data = dictionary["output"][0]
-            if "arguments" in function_call_data:
-                message_history.append({
-                    "type": "function_call",
-                    "id": function_call_data["id"],
-                    "call_id": function_call_data["call_id"],
-                    "name": function_call_data["name"],
-                    "arguments": function_call_data["arguments"]
-                })
-                
-                code_to_execute = json.loads(function_call_data["arguments"])["code"]
-                execution_result = execute_python_code(code_to_execute)
-                
-                message_history.append({
-                    "type": "function_call_output",
-                    "call_id": function_call_data["call_id"],
-                    "output": json.dumps(execution_result)
-                })
-                
-                if execution_result["error"] and execution_result["returncode"] != 0:
-                    assistant_response = f"Code Output:\n{execution_result['result']}\n\nError:\n{execution_result['error']}"
+                        "strict": True
+                    }
+                ],
+                temperature=1,
+                max_output_tokens=2048,
+                top_p=1,
+                store=True
+            )
+
+            dictionary = response.model_dump()
+
+            try:
+                function_call_data = dictionary["output"][0]
+                if "arguments" in function_call_data:
+                    timeline.append({
+                        "t": time.time(),
+                        "type": "function_call",
+                        "name": function_call_data.get("name"),
+                        "arguments": function_call_data.get("arguments")
+                    })
+                    message_history.append({
+                        "type": "function_call",
+                        "id": function_call_data.get("id"),
+                        "call_id": function_call_data.get("call_id"),
+                        "name": function_call_data.get("name"),
+                        "arguments": function_call_data.get("arguments")
+                    })
+
+                    args_json = function_call_data.get("arguments") or "{}"
+                    code_to_execute = json.loads(args_json).get("code", "")
+                    last_executed_code = code_to_execute
+                    timeline.append({"t": time.time(), "type": "code_executed", "code": code_to_execute})
+                    execution_result = execute_python_code(code_to_execute)
+                    last_execution_result = execution_result
+                    timeline.append({"t": time.time(), "type": "tool_result", "output": execution_result})
+
+                    message_history.append({
+                        "type": "function_call_output",
+                        "call_id": function_call_data.get("call_id"),
+                        "output": json.dumps(execution_result)
+                    })
+                    continue
                 else:
-                    assistant_response = f"Code Output:\n{execution_result['result']}"
-                
-                return jsonify({
-                    "response": assistant_response,
-                    "code_executed": code_to_execute,
-                    "execution_result": execution_result
+                    raise Exception("No function call")
+            except Exception:
+                content = dictionary["output"][0]["content"]
+                final_response_text = content[0]["text"] if isinstance(content, list) else str(content)
+                timeline.append({"t": time.time(), "type": "assistant_message", "content": final_response_text})
+                message_history.append({
+                    "id": dictionary["output"][0].get("id"),
+                    "role": "assistant",
+                    "content": content
                 })
+                break
+
+        if final_response_text is None and last_execution_result is not None:
+            if last_execution_result.get("error") and last_execution_result.get("returncode") != 0:
+                final_response_text = f"Code Output:\n{last_execution_result.get('result', '')}\n\nError:\n{last_execution_result.get('error', '')}"
             else:
-                raise Exception("No function call")
-                
-        except:
-            content = dictionary["output"][0]["content"]
-            assistant_response = content[0]["text"] if isinstance(content, list) else str(content)
-            
-            message_history.append({
-                "id": dictionary["output"][0]["id"],
-                "role": "assistant",
-                "content": content
-            })
-            
-            return jsonify({"response": assistant_response})
+                final_response_text = f"Code Output:\n{last_execution_result.get('result', '')}"
+
+        timeline.sort(key=lambda e: e.get("t", 0))
+        return jsonify({
+            "response": final_response_text or "",
+            "code_executed": last_executed_code,
+            "execution_result": last_execution_result,
+            "timeline": timeline
+        })
             
     except Exception as e:
         return jsonify({"error": str(e)}), 500
