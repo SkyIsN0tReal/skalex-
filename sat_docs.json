@@ -1,0 +1,15 @@
+{
+  "sat_overview": "The SAT (Scholastic Assessment Test) is a standardized test widely used for college admissions in the United States.",
+  "sections": {
+    "reading": "Tests reading comprehension and analysis skills",
+    "writing": "Tests grammar, usage, and rhetorical skills", 
+    "math": "Tests algebra, geometry, trigonometry, and data analysis"
+  },
+  "scoring": "Each section scored 200-800, total score 400-1600",
+  "test_tips": [
+    "Read questions carefully",
+    "Eliminate wrong answers",
+    "Manage time effectively",
+    "Practice regularly"
+  ]
+}

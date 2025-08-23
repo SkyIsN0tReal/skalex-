@@ -1,0 +1,13 @@
+ * Serving Flask app 'server'
+ * Debug mode: off
+[31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on http://127.0.0.1:5001
+[33mPress CTRL+C to quit[0m
+127.0.0.1 - - [23/Aug/2025 00:01:59] "GET /healthz HTTP/1.1" 200 -
+127.0.0.1 - - [23/Aug/2025 00:02:08] "POST /chat HTTP/1.1" 200 -
+127.0.0.1 - - [23/AugFatal Python error: init_sys_streams: can't initialize sys standard streams
+Python runtime state: core initialized
+OSError: [Errno 9] Bad file descriptor
+
+Current thread 0x00000001fab420c0 (most recent call first):
+  <no Python frame>

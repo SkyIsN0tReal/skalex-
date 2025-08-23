@@ -1,0 +1,660 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Skalex Chat</title>
+  <style>
+    :root {
+      --bg: #151419;
+      --input: #262626;
+      --accent: #F56E0F;
+      --text: #EDEDED;
+      --muted: #9aa0a6;
+      --radius: 14px;
+      --side-padding: 16px;
+      --bar-gap: 12px;
+      --content-max: 860px;
+      --input-gap: 4px;
+      --input-padding-y: 9px;
+      --input-padding-x: 9px;
+    }
+
+    * { box-sizing: border-box; }
+
+    html, body {
+      height: 100%;
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
+      overscroll-behavior: none;
+      scrollbar-width: none;
+      -ms-overflow-style: none;
+    }
+    html::-webkit-scrollbar, body::-webkit-scrollbar { width: 0; height: 0; }
+
+    .app {
+      min-height: 100%;
+      display: grid;
+      grid-template-rows: 1fr auto;
+    }
+
+    .messages {
+      max-width: var(--content-max);
+      width: 100%;
+      margin: 0 auto;
+      padding: 24px var(--side-padding) 75vh;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      scrollbar-width: none;
+      -ms-overflow-style: none;
+    }
+    .messages::-webkit-scrollbar { width: 0; height: 0; }
+
+    .msg {
+      max-width: 70%;
+      padding: 12px 14px;
+      border-radius: 12px;
+      line-height: 1.35;
+      background: transparent;
+      word-break: break-word;
+      overflow-wrap: anywhere;
+      white-space: pre-wrap;
+      align-self: flex-start;
+    }
+    .msg.me { 
+      align-self: flex-end; 
+      background: #222127;
+      animation: assimilate 200ms cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
+    }
+
+    @keyframes assimilate {
+      0% {
+        filter: blur(50px);
+        opacity: 0.3;
+        transform: scale(1.05);
+      }
+      100% {
+        filter: blur(0px);
+        opacity: 1;
+        transform: scale(1);
+      }
+    }
+    .msg .who { display: block; font-size: 12px; color: var(--muted); margin-bottom: 4px; }
+
+    .input-bar {
+      position: sticky;
+      bottom: 0;
+      background: transparent;
+      padding-bottom: max(env(safe-area-inset-bottom), 8px);
+    }
+
+    .input-inner {
+      max-width: var(--content-max);
+      width: 100%;
+      margin: 0 auto;
+      padding: 0 var(--side-padding);
+    }
+
+    .composer {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding-top: var(--bar-gap);
+      padding-bottom: var(--bar-gap);
+      justify-content: center;
+    }
+
+    .message-input {
+      position: relative;
+      flex: 1;
+      background: var(--input);
+      border-radius: var(--radius);
+      padding: var(--input-padding-y) var(--input-padding-x);
+      min-height: 74px;
+      display: grid;
+      grid-template-columns: 1fr auto;
+      align-items: center;
+      gap: var(--input-gap);
+      transition: box-shadow 220ms ease;
+      box-shadow: 0 0 0 0 var(--accent);
+      width: min(640px, 90%);
+      margin-left: auto;
+      margin-right: auto;
+      padding-right: 52px;
+    }
+    .message-input:focus-within {
+      box-shadow: 0 0 0 2px var(--accent);
+      animation: ring-thickness-bounce 700ms cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+
+    @keyframes ring-thickness-bounce {
+      0%   { box-shadow: 0 0 0 0 var(--accent); }
+      55%  { box-shadow: 0 0 0 4px var(--accent); }
+      100% { box-shadow: 0 0 0 2px var(--accent); }
+    }
+
+    .message-input textarea {
+      width: 100%;
+      resize: none;
+      border: none;
+      outline: none;
+      background: transparent;
+      color: var(--text);
+      font: inherit;
+      line-height: 1.35;
+      max-height: 160px;
+      padding-left: 10px;
+      padding-right: 8px;
+    }
+    .message-input textarea::placeholder { color: var(--muted); }
+
+    .send-btn {
+      width: 32px;
+      height: 32px;
+      background: var(--accent);
+      border: none;
+      color: #151419;
+      border-radius: calc(var(--radius) - 3px);
+      font-weight: 700;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      transition: transform 120ms ease;
+      position: absolute;
+      right: var(--input-padding-x);
+      bottom: var(--input-padding-y);
+    }
+    .send-btn:active { transform: translateY(1px) scale(0.98); }
+
+    .thinking-pill { display: inline-flex; align-items: center; padding: 10px 16px; border-radius: 999px; background: var(--input); color: #ffffff; font-size: 14px; line-height: 1; opacity: 0; transform: translateY(6px); animation: fadeUpIn 180ms ease forwards; margin-bottom: 8px; }
+    .thinking-pill.exit { animation: fadeDownOut 180ms ease forwards; }
+    .thinking-text { background: linear-gradient(90deg, rgba(255,255,255,0.35) 0%, rgba(255,255,255,1) 50%, rgba(255,255,255,0.35) 100%); background-size: 200% 100%; -webkit-background-clip: text; background-clip: text; color: transparent; animation: shimmer 1200ms linear infinite; }
+    @keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+    @keyframes fadeUpIn { 0% { opacity: 0; transform: translateY(6px); } 100% { opacity: 1; transform: translateY(0); } }
+    @keyframes fadeDownOut { 0% { opacity: 1; transform: translateY(0); } 100% { opacity: 0; transform: translateY(-6px); } }
+
+    .msg p { margin: 6px 0; }
+    .msg p:first-child { margin-top: 0; }
+    .msg p:last-child { margin-bottom: 0; }
+    .msg ul { margin: 6px 0; padding-left: 18px; }
+    .msg li { margin: 2px 0; }
+    .msg p:empty { display: none; }
+
+    .tool-card {
+      width: calc(100% + 28px);
+      border: 1px solid #2a2a2a;
+      border-radius: 10px;
+      background: transparent;
+      padding: 8px 10px;
+      margin: 6px 0;
+      box-sizing: border-box;
+      margin-left: -14px;
+      margin-right: -14px;
+    }
+    .tool-card .header { display: flex; align-items: center; gap: 8px; }
+    .tool-card .icon { display: inline-flex; align-items: center; color: var(--muted); }
+    .tool-card .status { font-size: 14px; color: var(--text); }
+    .tool-card .spacer { flex: 1; }
+    .tool-card .toggle { background: transparent; border: none; color: var(--muted); cursor: pointer; display: inline-flex; align-items: center; padding: 4px; border-radius: 8px; }
+    .tool-card .toggle:active { transform: translateY(1px); }
+    .tool-card .toggle svg { transition: transform 150ms ease; }
+    .tool-card.expanded .toggle svg { transform: rotate(180deg); }
+    .tool-card .details { margin-top: 8px; overflow: hidden; max-height: 0; opacity: 0; transform: translateY(-4px); transition: max-height 220ms ease, opacity 180ms ease, transform 180ms ease; }
+    .tool-card.expanded .details { max-height: 1000px; opacity: 1; transform: translateY(0); }
+    .tool-card pre { background: #0d1117; padding: 10px; border-radius: 8px; font-size: 13px; overflow: hidden; white-space: pre-wrap; font-family: Monaco, Consolas, monospace; }
+    .tool-card .label { color: var(--muted); font-size: 12px; margin: 6px 0 4px; }
+    .tool-summary { color: var(--muted); font-size: 13px; margin: 6px 0 0; }
+
+    .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <main class="messages" aria-live="polite">
+    </main>
+
+    <div class="input-bar">
+      <div class="input-inner">
+        <div class="composer">
+          <div class="message-input" id="messageInput">
+            
+            <textarea class="message-textarea" rows="1" placeholder="Type a message…" aria-label="Message"></textarea>
+            <button class="send-btn" type="button" aria-label="Send message">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+                <line x1="12" y1="21" x2="12" y2="3"></line>
+                <polyline points="5,10 12,3 19,10"></polyline>
+              </svg>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    (function() {
+      const input = document.querySelector('.message-textarea');
+      const container = document.querySelector('.message-input');
+      const send = document.querySelector('.send-btn');
+      const list = document.querySelector('.messages');
+      const API_HOST = window.location.hostname || 'localhost';
+      const API_BASE = window.location.port === '8000' ? '' : (window.location.protocol + '//' + API_HOST + ':8000');
+      
+      let sessionId = 'session_' + Math.random().toString(36).substr(2, 9);
+      let isLoading = false;
+      let controller = null;
+      let assistantContentEl = null;
+      let toolCards = [];
+      let collectedOutputs = [];
+
+      input.addEventListener('keydown', () => {
+        setTimeout(() => {
+          input.style.height = 'auto';
+          input.style.height = Math.min(input.scrollHeight, 160) + 'px';
+        }, 0);
+      });
+      input.dispatchEvent(new Event('keydown'));
+
+      function isNearBottom(threshold) {
+        const doc = document.documentElement;
+        const distance = doc.scrollHeight - (window.scrollY + window.innerHeight);
+        return distance < (threshold || 200);
+      }
+
+      function maybeAutoScroll(el) {
+        requestAnimationFrame(() => {
+          if (!isNearBottom(200) && !el) return;
+          if (el) {
+            const r = el.getBoundingClientRect();
+            if (r.bottom <= window.innerHeight - 80) return;
+            const target = window.scrollY + r.bottom - window.innerHeight + 80;
+            window.scrollTo({ top: target, behavior: 'smooth' });
+          } else {
+            const doc = document.documentElement;
+            const target = Math.max(0, doc.scrollHeight - window.innerHeight - 80);
+            window.scrollTo({ top: target, behavior: 'smooth' });
+          }
+        });
+      }
+
+      function escapeHtml(s) {
+        return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+      }
+
+      function inlineFormat(s) {
+        let t = s;
+        t = t.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+        t = t.replace(/`([^`]+)`/g, '<code>$1</code>');
+        return t;
+      }
+
+      function markdownToHtml(text) {
+        const lines = (text || '').split(/\r?\n/);
+        const out = [];
+        let inCode = false;
+        let inList = false;
+        for (let i = 0; i < lines.length; i++) {
+          const raw = lines[i];
+          const trimmed = raw.trim();
+          if (/^```/.test(trimmed)) {
+            if (!inCode) {
+              inCode = true;
+              out.push('<pre>');
+            } else {
+              inCode = false;
+              out.push('</pre>');
+            }
+            continue;
+          }
+          if (inCode) {
+            out.push(escapeHtml(raw));
+            continue;
+          }
+          if (/^#\s+/.test(trimmed)) { out.push('<p><strong>' + inlineFormat(escapeHtml(trimmed.replace(/^#\s+/, ''))) + '</strong></p>'); continue; }
+          if (/^##\s+/.test(trimmed)) { out.push('<p><strong>' + inlineFormat(escapeHtml(trimmed.replace(/^##\s+/, ''))) + '</strong></p>'); continue; }
+          if (/^###\s+/.test(trimmed)) { out.push('<p><strong>' + inlineFormat(escapeHtml(trimmed.replace(/^###\s+/, ''))) + '</strong></p>'); continue; }
+          const liMatch = /^[-*]\s+(.+)/.exec(trimmed);
+          if (liMatch) {
+            if (!inList) { inList = true; out.push('<ul>'); }
+            out.push('<li>' + inlineFormat(escapeHtml(liMatch[1])) + '</li>');
+            continue;
+          } else if (inList) {
+            out.push('</ul>');
+            inList = false;
+          }
+          if (trimmed.length === 0) { out.push(''); continue; }
+          out.push('<p>' + inlineFormat(escapeHtml(raw)) + '</p>');
+        }
+        if (inList) out.push('</ul>');
+        if (inCode) out.push('</pre>');
+        return out.join('\n');
+      }
+
+      function appendMessage(text, isUser = false, isCode = false) {
+        if (!text) return;
+        const item = document.createElement('div');
+        item.className = isUser ? 'msg me' : 'msg';
+        
+        if (isCode) {
+          const pre = document.createElement('pre');
+          pre.style.background = '#0d1117';
+          pre.style.padding = '12px';
+          pre.style.borderRadius = '8px';
+          pre.style.overflow = 'hidden';
+          pre.style.fontSize = '14px';
+          pre.style.fontFamily = 'Monaco, Consolas, monospace';
+          pre.style.whiteSpace = 'pre-wrap';
+          pre.appendChild(document.createTextNode(text));
+          item.appendChild(pre);
+        } else {
+          const content = document.createElement('div');
+          content.style.whiteSpace = 'pre-wrap';
+          content.innerHTML = markdownToHtml(text);
+          item.appendChild(content);
+        }
+        
+        list.appendChild(item);
+        maybeAutoScroll(item);
+        return item;
+      }
+      function createAssistantBubble() {
+        const item = document.createElement('div');
+        item.className = 'msg';
+        const content = document.createElement('div');
+        content.style.whiteSpace = 'pre-wrap';
+        item.appendChild(content);
+        list.appendChild(item);
+        maybeAutoScroll(item);
+        return content;
+      }
+
+      function appendToAssistant(text, isCode = false) {
+        if (!assistantContentEl || !text) return;
+        let appended = null;
+        if (isCode) {
+          const pre = document.createElement('pre');
+          pre.style.background = '#0d1117';
+          pre.style.padding = '12px';
+          pre.style.borderRadius = '8px';
+          pre.style.overflow = 'hidden';
+          pre.style.fontSize = '14px';
+          pre.style.fontFamily = 'Monaco, Consolas, monospace';
+          pre.style.whiteSpace = 'pre-wrap';
+          pre.appendChild(document.createTextNode(text));
+          assistantContentEl.appendChild(pre);
+          appended = pre;
+        } else {
+          const content = document.createElement('div');
+          content.style.whiteSpace = 'pre-wrap';
+          content.innerHTML = markdownToHtml(text);
+          assistantContentEl.appendChild(content);
+          appended = content;
+        }
+        maybeAutoScroll(appended);
+      }
+
+      function createToolCard() {
+        if (!assistantContentEl) return null;
+        const card = document.createElement('div');
+        card.className = 'tool-card';
+        const header = document.createElement('div');
+        header.className = 'header';
+        const icon = document.createElement('div');
+        icon.className = 'icon';
+        icon.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M10.9999 12L3.92886 19.0711L2.51465 17.6569L8.1715 12L2.51465 6.34317L3.92886 4.92896L10.9999 12ZM10.9999 19H20.9999V21H10.9999V19Z"></path></svg>';
+        const status = document.createElement('div');
+        status.className = 'status';
+        status.textContent = 'Coding...';
+        const spacer = document.createElement('div');
+        spacer.className = 'spacer';
+        const toggle = document.createElement('button');
+        toggle.type = 'button';
+        toggle.className = 'toggle';
+        toggle.setAttribute('aria-label', 'Toggle details');
+        toggle.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="6,9 12,15 18,9"></polyline></svg>';
+        const details = document.createElement('div');
+        details.className = 'details';
+        const codeLabel = document.createElement('div');
+        codeLabel.className = 'label';
+        codeLabel.textContent = 'Code';
+        const codePre = document.createElement('pre');
+        const outLabel = document.createElement('div');
+        outLabel.className = 'label';
+        outLabel.textContent = 'Output';
+        const outPre = document.createElement('pre');
+        details.appendChild(codeLabel);
+        details.appendChild(codePre);
+        details.appendChild(outLabel);
+        details.appendChild(outPre);
+        header.appendChild(icon);
+        header.appendChild(status);
+        header.appendChild(spacer);
+        header.appendChild(toggle);
+        card.appendChild(header);
+        card.appendChild(details);
+        assistantContentEl.appendChild(card);
+        toggle.addEventListener('click', (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          const expanded = card.classList.toggle('expanded');
+          const rect = card.getBoundingClientRect();
+          if (rect.top < 0 || rect.bottom > window.innerHeight) {
+            const target = window.scrollY + rect.top - 24;
+            window.scrollTo({ top: target, behavior: 'smooth' });
+          }
+        });
+        const api = {
+          setStatusEnded: () => { status.textContent = 'Coding Ended'; },
+          setCode: (code) => { codePre.textContent = code || ''; },
+          setOutput: (text) => { outPre.textContent = text || ''; if (text) collectedOutputs.push(text); },
+          appendSummaryBelow: (summary) => {
+            const s = document.createElement('div');
+            s.className = 'tool-summary';
+            s.textContent = summary;
+            card.insertAdjacentElement('afterend', s);
+            maybeAutoScroll(s);
+          },
+          root: card
+        };
+        toolCards.push(api);
+        maybeAutoScroll(card);
+        return api;
+      }
+
+      function getLastToolCard() {
+        return toolCards.length ? toolCards[toolCards.length - 1] : null;
+      }
+
+      function showThinkingPill() {
+        const existing = document.querySelector('.thinking-pill');
+        if (existing) return existing;
+        const pill = document.createElement('div');
+        pill.className = 'thinking-pill';
+        const text = document.createElement('span');
+        text.className = 'thinking-text';
+        text.textContent = 'Thinking...';
+        pill.appendChild(text);
+        const composer = document.querySelector('.composer');
+        composer.insertBefore(pill, document.getElementById('messageInput'));
+        return pill;
+      }
+      function dismissThinkingPill(pill) {
+        if (!pill) return;
+        pill.classList.add('exit');
+        pill.addEventListener('animationend', () => removeNode(pill), { once: true });
+      }
+
+      function removeNode(node) {
+        if (node && node.parentNode) node.parentNode.removeChild(node);
+      }
+
+      function setSendButtonState(state) {
+        if (state === 'stop') {
+          send.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="6" width="12" height="12"></rect></svg>';
+          send.setAttribute('aria-label', 'Stop');
+        } else {
+          send.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="21" x2="12" y2="3"></line><polyline points="5,10 12,3 19,10"></polyline></svg>';
+          send.setAttribute('aria-label', 'Send message');
+        }
+      }
+
+      function stopStreaming() {
+        if (controller) controller.abort();
+      }
+
+      function stripDuplicateOutput(text) {
+        if (!text) return text;
+        let result = text;
+        collectedOutputs.forEach(o => {
+          if (o && typeof o === 'string' && o.length) {
+            result = result.replace(o, '').trim();
+          }
+        });
+        result = result.replace(/(^|\n)Code Output:[\s\S]*$/m, '').trim();
+        return result;
+      }
+
+      async function sendMessage(message) {
+        if (isLoading || !message.trim()) return;
+        
+        isLoading = true;
+        setSendButtonState('stop');
+        
+        appendMessage(message, true);
+        assistantContentEl = createAssistantBubble();
+        const thinkingIndicator = showThinkingPill();
+        
+        try {
+          controller = new AbortController();
+          const response = await fetch(API_BASE + '/chat', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              message: message,
+              session_id: sessionId
+            }),
+            signal: controller.signal
+          });
+          
+          const contentType = response.headers.get('content-type') || '';
+          const rawBody = await response.text();
+          let data = null;
+          if (contentType.includes('application/json')) {
+            try { data = JSON.parse(rawBody || '{}'); } catch (e) { data = {}; }
+          } else {
+            try { data = JSON.parse(rawBody || '{}'); } catch (e) { data = {}; }
+          }
+          if (!response.ok) {
+            const messageText = (data && data.error) || (rawBody && rawBody.trim()) || ('HTTP ' + response.status + ' ' + response.statusText);
+            throw new Error(messageText);
+          }
+          dismissThinkingPill(thinkingIndicator);
+          
+          if (data.error) {
+            appendToAssistant('Error: ' + data.error);
+          } else {
+            if (Array.isArray(data.timeline) && data.timeline.length) {
+              let hadToolActivity = false;
+              data.timeline
+                .sort((a, b) => (a.t || 0) - (b.t || 0))
+                .forEach(ev => {
+                  if (ev.type === 'function_call') {
+                    createToolCard();
+                    hadToolActivity = true;
+                  } else if (ev.type === 'code_executed') {
+                    const card = getLastToolCard();
+                    if (card) card.setCode(ev.code || '');
+                    hadToolActivity = true;
+                  } else if (ev.type === 'tool_result') {
+                    const out = (ev.output && ev.output.result) ? ev.output.result : '';
+                    const err = (ev.output && ev.output.error) ? ev.output.error : '';
+                    const combined = (out || err) ? (out + (err ? '\n' + err : '')) : '';
+                    const card = getLastToolCard();
+                    if (card) {
+                      card.setOutput(combined);
+                      card.setStatusEnded();
+                    }
+                    hadToolActivity = true;
+                  } else if (ev.type === 'assistant_message') {
+                    const content = typeof ev.content === 'string' ? ev.content : (ev.content && ev.content.text) || '';
+                    const cleaned = stripDuplicateOutput(content || '');
+                    if (hadToolActivity) {
+                      const card = getLastToolCard();
+                      if (card && cleaned) card.appendSummaryBelow(cleaned);
+                    } else if (cleaned) {
+                      appendToAssistant(cleaned);
+                    }
+                  }
+                });
+            } else {
+              const hadToolActivity = !!(data.code_executed || (data.execution_result && (data.execution_result.result || data.execution_result.error)));
+              if (hadToolActivity) {
+                const card = createToolCard();
+                if (card) {
+                  if (data.code_executed) card.setCode(data.code_executed || '');
+                  const out = (data.execution_result && data.execution_result.result) ? data.execution_result.result : '';
+                  const err = (data.execution_result && data.execution_result.error) ? data.execution_result.error : '';
+                  const combined = (out || err) ? (out + (err ? '\n' + err : '')) : '';
+                  card.setOutput(combined);
+                  card.setStatusEnded();
+                }
+              }
+              const resp = (data && typeof data.response === 'string') ? data.response : '';
+              const cleaned = stripDuplicateOutput(resp || '');
+              if (!hadToolActivity) {
+                appendToAssistant(cleaned || 'No response received');
+              } else if (cleaned) {
+                const card = getLastToolCard();
+                if (card) card.appendSummaryBelow(cleaned); else appendToAssistant(cleaned);
+              }
+            }
+          }
+        } catch (error) {
+          dismissThinkingPill(thinkingIndicator);
+          if (error.name === 'AbortError') {
+            appendToAssistant('Stopped');
+          } else {
+            appendToAssistant('Connection error: ' + error.message);
+          }
+        }
+        
+        isLoading = false;
+        setSendButtonState('send');
+        controller = null;
+        assistantContentEl = null;
+        toolCards = [];
+        collectedOutputs = [];
+      }
+
+      send.addEventListener('click', () => {
+        if (isLoading) {
+          stopStreaming();
+          return;
+        }
+        const message = input.value.trim();
+        if (message) {
+          sendMessage(message);
+          input.value = '';
+          input.dispatchEvent(new Event('keydown'));
+          input.focus();
+        }
+      });
+
+      input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+          e.preventDefault();
+          send.click();
+        }
+      });
+
+      appendMessage('Chat agent connected. You can ask questions or request Python code execution.');
+    })();
+  </script>
+</body>
+</html> 
