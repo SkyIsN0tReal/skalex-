@@ -30,8 +30,8 @@ def get_session(session_id):
         sessions[session_id] = {
             "message_history": [
                 {
-                    "role": "system", 
-                    "content": f"You are a helpful assistant that can execute python code. When executing code, always *print* the result. NEVER use notebook style output. Here are some relevant SAT docs: {json.dumps(sat_docs)}"
+                    "role": "system",
+                    "content": f"You are a helpful assistant that can execute python code. When executing code, always print the result to stdout. Keep responses concise. Use Markdown sparingly and tastefully: use headers (###) only when they add structure, bullet lists for 3-7 related items, and bold to emphasize a few key phrases. Avoid excessive formatting, emojis, and decorative text. Here are some relevant SAT docs: {json.dumps(sat_docs)}"
                 }
             ]
         }
