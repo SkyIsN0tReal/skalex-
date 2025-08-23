@@ -9,6 +9,7 @@ from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
 from openai import OpenAI
 from dotenv import load_dotenv
+from werkzeug.utils import secure_filename
 
 load_dotenv()
 
@@ -198,6 +199,25 @@ def clear_session(session_id):
     if session_id in sessions:
         del sessions[session_id]
     return jsonify({"message": "Session cleared"})
+
+@app.route('/upload-json', methods=['POST'])
+def upload_json():
+    try:
+        if 'file' not in request.files:
+            return jsonify({"ok": False, "error": "No file provided"}), 400
+        f = request.files['file']
+        if not f or f.filename == '':
+            return jsonify({"ok": False, "error": "Empty filename"}), 400
+        safe_name = secure_filename(f.filename or "")
+        if not safe_name:
+            return jsonify({"ok": False, "error": "Invalid filename"}), 400
+        if not safe_name.lower().endswith('.json'):
+            return jsonify({"ok": False, "error": "Only .json files allowed"}), 400
+        save_path = os.path.join(os.path.dirname(__file__), safe_name)
+        f.save(save_path)
+        return jsonify({"ok": True, "filename": safe_name})
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
 
 if __name__ == "__main__":
     print("Starting chat agent server...")
