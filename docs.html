@@ -17,6 +17,7 @@
       --text-secondary: #B0B0B0;
       --card-bg: #1E1E21;
       --code-bg: #2A2A2D;
+      --sidebar-width: 260px;
     }
 
     /* Reset & Base Styles */
@@ -85,10 +86,10 @@
 
     /* Sidebar */
     aside {
-      width: 260px;
-      flex: 0 0 260px;
-      min-width: 260px;
-      max-width: 260px;
+      width: var(--sidebar-width);
+      flex: 0 0 var(--sidebar-width);
+      min-width: var(--sidebar-width);
+      max-width: var(--sidebar-width);
       background: var(--sidebar);
       border-right: 1px solid var(--border);
       padding: 16px;
@@ -101,6 +102,8 @@
       overflow-x: hidden;
       overscroll-behavior: none;
     }
+    aside.accent-border { border-right-color: var(--accent); }
+    .sidebar-resizer { position: absolute; top: 0; right: 0; width: 8px; height: 100%; cursor: col-resize; }
     .brand {
       font-weight: 600;
       margin: 4px 8px 12px 8px;
@@ -115,16 +118,17 @@
       color: var(--text);
       margin-bottom: 4px;
       display: block;
-      width: 100%;
+      width: fit-content;
+      max-width: 100%;
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
+      position: relative;
     }
     .nav-item:hover { background: #2A2A2D; }
-    .nav-item.active {
-      background: var(--accent);
-      color: var(--bg);
-    }
+    .nav-item.active { background: transparent; color: var(--bg); }
+    .nav-item::before { content: ""; position: absolute; inset: 0; background: var(--accent); border-radius: 8px; opacity: 0; transition: opacity 200ms ease; z-index: -1; }
+    .nav-item.active::before { opacity: 1; }
 
     /* Main Content */
     main { flex: 1; padding: 24px; overscroll-behavior: none; }
@@ -142,7 +146,7 @@
     /* Tabs */
     .tabs {
       position: absolute;
-      top: 8px;
+      top: 6px;
       right: 8px;
       display: flex;
       gap: 8px;
@@ -151,8 +155,8 @@
       z-index: 1;
     }
     .tab {
-      padding: 6px 12px;
-      border: 1px solid var(--border);
+      padding: 8px 12px;
+      border: 0;
       border-radius: 8px;
       background: var(--card-bg);
       cursor: pointer;
@@ -163,6 +167,45 @@
       background: var(--accent);
       color: var(--bg);
       border-color: var(--accent);
+    }
+    .tab-select {
+      padding: 6px 10px;
+      border: 0;
+      border-radius: 8px;
+      background: var(--card-bg);
+      cursor: pointer;
+      color: var(--text);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+      line-height: 14px;
+    }
+    .tab-select svg { width: 14px; height: 14px; color: var(--text-secondary); }
+    .tab-select .arrow { transition: transform 160ms ease; }
+    .tab-select.open .arrow { transform: rotate(180deg); }
+    .tab-menu {
+      position: absolute;
+      top: 32px;
+      right: 0;
+      display: block;
+      visibility: hidden;
+      opacity: 0;
+      transform: translateY(-6px);
+      min-width: 140px;
+      border: 0;
+      border-radius: 8px;
+      background: var(--card-bg);
+      padding: 6px;
+      z-index: 2;
+      transition: opacity 160ms ease, transform 160ms ease, visibility 160ms;
+    }
+    .tab-menu.open { visibility: visible; opacity: 1; transform: translateY(0); }
+    .tab-menu .tab {
+      width: 100%;
+      text-align: left;
+      margin: 0;
+      display: block;
     }
 
     /* Code Blocks */
@@ -177,16 +220,17 @@
       border: 0;
       border-radius: 10px;
       margin: 0;
-      padding: 14px;
+      padding: 8px;
     }
-    .code-cell.with-tabs pre { padding-top: 52px; }
+    .code-cell.with-tabs pre { padding: 14px 12px; }
     pre {
       border: 1px solid var(--border);
       border-radius: 10px;
-      padding: 14px;
+      padding: 8px;
       overflow: auto;
       background: var(--code-bg);
     }
+    pre code.hljs { display: block; padding: 0; }
     pre::-webkit-scrollbar,
     .code-cell::-webkit-scrollbar,
     body::-webkit-scrollbar,
@@ -284,6 +328,7 @@
       <aside>
         <div class="brand">Docs</div>
         <div id="sidebar"></div>
+        <div id="sidebar-resizer" class="sidebar-resizer"></div>
       </aside>
       <main>
         <div id="content"></div>
@@ -301,6 +346,18 @@
     const state = { pages: [], currentIndex: 0 };
     const el = id => document.getElementById(id);
     const setError = msg => { const e = el('error'); e.textContent = msg || ''; };
+    const createDownArrow = () => {
+      const ns = 'http://www.w3.org/2000/svg';
+      const svg = document.createElementNS(ns, 'svg');
+      svg.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+      svg.setAttribute('viewBox', '0 0 24 24');
+      svg.setAttribute('fill', 'currentColor');
+      svg.setAttribute('class', 'arrow');
+      const path = document.createElementNS(ns, 'path');
+      path.setAttribute('d', 'M11.9999 13.1714L16.9497 8.22168L18.3639 9.63589L11.9999 15.9999L5.63599 9.63589L7.0502 8.22168L11.9999 13.1714Z');
+      svg.appendChild(path);
+      return svg;
+    };
     const languageMeta = k => {
       const key = String(k || '').toLowerCase();
       if (key === 'python' || key === 'py') return { label: 'Python', hljs: 'python' };
@@ -574,20 +631,6 @@
         tabs.className = 'tabs';
         const blocks = document.createElement('div');
         codes.forEach((c, i) => {
-          const t = document.createElement('button');
-          t.className = 'tab' + (i === 0 ? ' active' : '');
-          t.textContent = c.label;
-          t.addEventListener('click', () => {
-            const prev = tabs.querySelector('.tab.active');
-            if (prev) prev.classList.remove('active');
-            t.classList.add('active');
-            [...blocks.children].forEach((child, j) => child.style.display = j === i ? 'block' : 'none');
-            const activeCode = blocks.children[i]?.querySelector('code');
-            if (activeCode && !activeCode.classList.contains('hljs')) {
-              hljs.highlightElement(activeCode);
-            }
-          });
-          tabs.appendChild(t);
           const cell = document.createElement('div');
           cell.className = 'code-cell' + (codes.length > 1 ? ' with-tabs' : '');
           cell.style.display = i === 0 ? 'block' : 'none';
@@ -600,7 +643,44 @@
           blocks.appendChild(cell);
         });
         group.appendChild(blocks);
-        if (codes.length > 1) group.appendChild(tabs);
+        if (codes.length > 1) {
+          const select = document.createElement('button');
+          select.className = 'tab-select';
+          const labelSpan = document.createElement('span');
+          labelSpan.textContent = codes[0].label;
+          select.appendChild(labelSpan);
+          const arrow = createDownArrow();
+          select.appendChild(arrow);
+          const menu = document.createElement('div');
+          menu.className = 'tab-menu';
+          codes.forEach((c, i) => {
+            const item = document.createElement('button');
+            item.className = 'tab';
+            item.textContent = c.label;
+            item.addEventListener('click', () => {
+              labelSpan.textContent = c.label;
+              menu.classList.remove('open');
+              [...blocks.children].forEach((child, j) => child.style.display = j === i ? 'block' : 'none');
+              const activeCode = blocks.children[i]?.querySelector('code');
+              if (activeCode && !activeCode.classList.contains('hljs')) {
+                hljs.highlightElement(activeCode);
+              }
+            });
+            menu.appendChild(item);
+          });
+          select.addEventListener('click', e => {
+            e.stopPropagation();
+            menu.classList.toggle('open');
+            const isOpen = menu.classList.contains('open');
+            if (isOpen) select.classList.add('open'); else select.classList.remove('open');
+          });
+          document.addEventListener('click', e => {
+            if (!tabs.contains(e.target)) menu.classList.remove('open');
+          });
+          tabs.appendChild(select);
+          tabs.appendChild(menu);
+          group.appendChild(tabs);
+        }
         host.appendChild(group);
         blocks.querySelectorAll('code').forEach(e => hljs.highlightElement(e));
       };
@@ -673,6 +753,46 @@
       r.onerror = () => setError('Failed to read file');
       r.readAsText(f);
     });
+
+    const asideEl = document.querySelector('aside');
+    const resizer = document.getElementById('sidebar-resizer');
+    let isResizing = false;
+    let startX = 0;
+    let startWidth = 0;
+
+    const setSidebarWidth = w => {
+      const min = 180;
+      const max = 560;
+      const width = Math.min(max, Math.max(min, w));
+      document.documentElement.style.setProperty('--sidebar-width', width + 'px');
+    };
+
+    const onMouseMove = e => {
+      if (!isResizing) return;
+      const dx = e.clientX - startX;
+      setSidebarWidth(startWidth + dx);
+    };
+    const onMouseUp = () => {
+      if (!isResizing) return;
+      isResizing = false;
+      document.body.style.userSelect = '';
+      document.removeEventListener('mousemove', onMouseMove);
+      document.removeEventListener('mouseup', onMouseUp);
+    };
+    if (resizer && asideEl) {
+      resizer.addEventListener('mousedown', e => {
+        isResizing = true;
+        startX = e.clientX;
+        startWidth = asideEl.getBoundingClientRect().width;
+        document.body.style.userSelect = 'none';
+        document.addEventListener('mousemove', onMouseMove);
+        document.addEventListener('mouseup', onMouseUp);
+      });
+      resizer.addEventListener('mouseenter', () => asideEl.classList.add('accent-border'));
+      resizer.addEventListener('mouseleave', () => {
+        if (!isResizing) asideEl.classList.remove('accent-border');
+      });
+    }
   </script>
 </body>
 </html>
