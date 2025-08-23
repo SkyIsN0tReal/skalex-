@@ -16,10 +16,11 @@ app = Flask(__name__)
 CORS(app)
 
 try:
-    with open("/Users/sky/Desktop/skalex/agent/sat2.json", "r") as f:
-        sat_docs = json.load(f)
+    with open("/Users/alexanderfavvas/skalex/agent/craigslist_docs.json", "r") as f:
+        docs = json.load(f)
+        #raise FileNotFoundError
 except FileNotFoundError:
-    sat_docs = {"error": "SAT docs not found"}
+    docs = {"error": "Docs not found"}
 
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
@@ -31,7 +32,7 @@ def get_session(session_id):
             "message_history": [
                 {
                     "role": "system",
-                    "content": f"You are a helpful assistant that can execute python code. When executing code, always print the result to stdout. Keep responses concise. Use Markdown sparingly and tastefully: use headers (###) only when they add structure, bullet lists for 3-7 related items, and bold to emphasize a few key phrases. Avoid excessive formatting, emojis, and decorative text. Here are some relevant SAT docs: {json.dumps(sat_docs)}"
+                    "content": f"You are a helpful assistant that can execute python code. When executing code, always print the result to stdout (so don't write 'x' to see x, write 'print(x)'). Keep responses concise. Use Markdown sparingly and tastefully: use headers (###) only when they add structure, bullet lists for 3-7 related items, and bold to emphasize a few key phrases. Avoid excessive formatting, emojis, and decorative text. If you get an error, try to fix it immediately after, do not ask for confirmation. Here are some relevant docs: {json.dumps(docs)}"
                 }
             ]
         }
@@ -87,7 +88,7 @@ def chat():
         })
         
         timeline = []
-        timeline.append({"t": time.time(), "type": "user_message", "data": user_message})
+        timeline.append({"t": time.time(), "type": "user_message", "data": user_message})                                                                                     
         
         max_tool_iterations = 5
         final_response_text = None

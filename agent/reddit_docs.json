@@ -1,0 +1,123 @@
+{
+  "pages": [
+    {
+      "title": "Quickstart",
+      "content": [
+        {
+          "type": "text",
+          "value": "This documentation outlines how to interact with the Reddit web platform's internal services. The process begins with establishing a session to gather necessary authentication cookies, followed by using these cookies to make subsequent API calls, primarily to its event logging, GraphQL, and post retrieval endpoints.\n\nTo begin, you must first make a request to the Reddit homepage to receive essential cookies."
+        },
+        {
+          "type": "code_snippet",
+          "languages": {
+            "python": "import requests\n\n# Use a session object to persist cookies\nsession = requests.Session()\n\n# Set a standard browser User-Agent header\nheaders = {\n    'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36'\n}\n\n# Make the initial request to the homepage\nresponse = session.get('https://www.reddit.com/', headers=headers)\n\n# The session object now contains the necessary cookies for future requests\nprint('Initial request successful. Cookies are stored in the session.')\nprint('CSRF Token:', session.cookies.get('csrf_token'))",
+            "cURL": "# First, make a request to the homepage and save the cookies to a file\ncurl -c reddit_cookies.txt -A 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36' 'https://www.reddit.com/'\n\n# You can now use 'reddit_cookies.txt' for subsequent API calls"
+          }
+        },
+        {
+          "type": "text",
+          "value": "After initializing the session, you can interact with Reddit's services. For example, you can fetch post data using the JSON API, send events via the eventing service, or make GraphQL queries."
+        },
+        {
+          "type": "code_snippet",
+          "languages": {
+            "python": "# Example: Fetch a Reddit post using the JSON API\npost_id = '1mxe278'\npost_url = f'https://www.reddit.com/comments/{post_id}/.json'\n\nresponse = session.get(post_url, headers=headers)\nif response.status_code == 200:\n    post_data = response.json()\n    # Extract post information from the response\n    post = post_data[0]['data']['children'][0]['data']\n    print(f\"Title: {post['title']}\")\n    print(f\"Author: {post['author']}\")\n    print(f\"Score: {post['score']}\")",
+            "cURL": "# Fetch a Reddit post using the JSON API\ncurl -b reddit_cookies.txt \\\n-A 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36' \\\n'https://www.reddit.com/comments/1mxe278/.json'"
+          }
+        }
+      ]
+    },
+    {
+      "title": "Authentication",
+      "content": [
+        {
+          "type": "text",
+          "value": "The Reddit web platform uses a cookie-based authentication system. For guest (unauthenticated) users, a session is established by sending a GET request to the homepage. This initial request is critical as the server responds with several `Set-Cookie` headers that are required for all subsequent API calls to function correctly."
+        },
+        {
+          "type": "text",
+          "value": "Key cookies that are set include:\n- `loid`: A long-lived identifier for the device or browser.\n- `session_tracker`: Tracks the user's session.\n- `csrf_token`: A Cross-Site Request Forgery token. This token must be included in the body of subsequent POST requests.\n- `token_v2`: A JSON Web Token (JWT) that contains claims about the user's session and identity.\n- `edgebucket`: Used for server-side testing and feature flagging.\n\nIt is essential to capture and resend these cookies with every subsequent request. Using a session manager in your HTTP client is the recommended approach."
+        },
+        {
+          "type": "code_snippet",
+          "languages": {
+            "python": "import requests\n\n# Using a requests.Session() object automatically handles cookie management.\nsession = requests.Session()\n\n# It's crucial to mimic a real browser's User-Agent.\nheaders = {\n    'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36',\n    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',\n    'Accept-Language': 'en-US,en;q=0.9'\n}\n\n# The initial request to establish the session and get cookies.\nresponse = session.get('https://www.reddit.com/', headers=headers)\n\nprint(f'Status Code: {response.status_code}')\nprint('Cookies received:')\nfor name, value in session.cookies.items():\n    print(f'- {name}')",
+            "javascript": "// In a browser environment, 'fetch' can handle cookies if configured correctly.\n// Note: This is for server-side JS like Node.js, as browser-side JS cannot typically set arbitrary headers for cross-origin requests.\nconst fetch = require('node-fetch');\n\nasync function getRedditSession() {\n    const headers = {\n        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36',\n        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8'\n    };\n\n    const response = await fetch('https://www.reddit.com/', { headers });\n    const cookies = response.headers.raw()['set-cookie'];\n\n    console.log('Cookies received:', cookies);\n    return cookies;\n}"
+          }
+        }
+      ]
+    },
+    {
+      "title": "Post Data Retrieval",
+      "content": [
+        {
+          "type": "text",
+          "value": "Reddit provides multiple ways to retrieve post data. The most reliable method is using the JSON API by appending `.json` to post URLs. This method works for both individual posts and subreddit listings."
+        },
+        {
+          "type": "text",
+          "value": "### JSON API Endpoints\n\n**Individual Posts:** `GET /comments/{post_id}/.json` or `GET /r/{subreddit}/comments/{post_id}/{title}/.json`\n\n**Subreddit Listings:** `GET /r/{subreddit}/.json` or `GET /.json` (frontpage)\n\n**Popular/All:** `GET /r/popular/.json` or `GET /r/all/.json`\n\nThe response contains a JSON array where the first element contains post data and the second element (if present) contains comments."
+        },
+        {
+          "type": "code_snippet",
+          "languages": {
+            "python": "# Fetch individual post data\nimport requests\nimport json\n\n# Authenticated session (from previous examples)\nsession = requests.Session()\nheaders = {'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36'}\nsession.get('https://www.reddit.com/', headers=headers)\n\n# Method 1: Using post ID directly\npost_id = '1mxe278'\nresponse = session.get(f'https://www.reddit.com/comments/{post_id}/.json', headers=headers)\n\nif response.status_code == 200:\n    data = response.json()\n    post = data[0]['data']['children'][0]['data']\n    \n    print(f\"Title: {post['title']}\")\n    print(f\"Author: {post['author']}\")\n    print(f\"Subreddit: {post['subreddit']}\")\n    print(f\"Score: {post['score']}\")\n    print(f\"Comments: {post['num_comments']}\")\nelse:\n    print(f\"Failed to fetch post: {response.status_code}\")",
+            "javascript": "// Node.js example for fetching post data\nconst fetch = require('node-fetch');\n\nasync function fetchRedditPost(postId) {\n    const headers = {\n        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36'\n    };\n    \n    try {\n        const response = await fetch(`https://www.reddit.com/comments/${postId}/.json`, { headers });\n        \n        if (response.ok) {\n            const data = await response.json();\n            const post = data[0].data.children[0].data;\n            \n            return {\n                title: post.title,\n                author: post.author,\n                subreddit: post.subreddit,\n                score: post.score,\n                comments: post.num_comments\n            };\n        }\n    } catch (error) {\n        console.error('Error fetching post:', error);\n    }\n}\n\n// Usage\nfetchRedditPost('1mxe278').then(post => console.log(post));",
+            "cURL": "# Fetch post data using cURL\ncurl -H 'User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) APpleWebKit/537.36' \\\n     'https://www.reddit.com/comments/1mxe278/.json' | jq '.'"
+          }
+        },
+        {
+          "type": "text",
+          "value": "### Extracting Post IDs from URLs\n\nWhen working with full Reddit URLs, you may need to extract the post ID or load the page to find the actual post ID. Reddit uses various URL formats, and sometimes the post ID in the URL doesn't match the actual post being displayed."
+        },
+        {
+          "type": "code_snippet",
+          "languages": {
+            "python": "import re\n\ndef extract_post_id_from_url(url):\n    \"\"\"Extract post ID from Reddit URL patterns\"\"\"\n    patterns = [\n        r'/comments/([a-zA-Z0-9]+)',\n        r'/r/[^/]+/comments/([a-zA-Z0-9]+)',\n        r'/u/[^/]+/comments/([a-zA-Z0-9]+)',\n    ]\n    \n    for pattern in patterns:\n        match = re.search(pattern, url)\n        if match:\n            return match.group(1)\n    return None\n\ndef get_post_id_from_page(session, url, headers):\n    \"\"\"Load Reddit page and extract post ID from HTML\"\"\"\n    response = session.get(url, headers=headers)\n    if response.status_code != 200:\n        return None\n    \n    # Look for post ID in HTML elements\n    html = response.text\n    \n    # Try to find post-title elements with IDs\n    match = re.search(r'post-title-t3_([a-zA-Z0-9]+)', html)\n    if match:\n        return match.group(1)\n    \n    return None\n\n# Example usage\nurl = 'https://www.reddit.com/r/programming/comments/abc123/some_title/'\npost_id = extract_post_id_from_url(url)\nprint(f'Extracted post ID: {post_id}')",
+            "regex": "# Common regex patterns for extracting post IDs from Reddit URLs\n\n# Basic post ID extraction\n/comments/([a-zA-Z0-9]+)\n\n# From subreddit post URLs\n/r/[^/]+/comments/([a-zA-Z0-9]+)\n\n# From user post URLs  \n/u/[^/]+/comments/([a-zA-Z0-9]+)\n\n# From HTML post-title elements\npost-title-t3_([a-zA-Z0-9]+)\n\n# From HTML id attributes\nid=\"t3_([a-zA-Z0-9]+)\""
+          }
+        }
+      ]
+    },
+    {
+      "title": "Endpoints",
+      "content": [
+        {
+          "type": "text",
+          "value": "Reddit's frontend communicates with several key backend services. After authenticating and receiving cookies, you can interact with these endpoints."
+        },
+        {
+          "type": "text",
+          "value": "### Event Logging\n\nReddit extensively tracks user interactions for analytics and application monitoring. These events are sent to the `/svc/shreddit/events` endpoint.\n\n**Endpoint:** `POST /svc/shreddit/events`\n\n**Headers:**\n- `Content-Type`: `text/PLAIN`\n\n**Body:** The body is a JSON string containing a `CSRF` token and an array of event objects under the `info` key. Each event has a `source`, `action`, and `noun` to describe the interaction, along with a client timestamp and other contextual metadata."
+        },
+        {
+          "type": "code_snippet",
+          "languages": {
+            "cURL": "# This example sends a 'performance' trace event.\n# Ensure reddit_cookies.txt exists from the initial homepage request.\nCSRF_TOKEN=$(cat reddit_cookies.txt | grep 'csrf_token' | awk '{print $NF}')\n\ncurl -X POST 'https://www.reddit.com/svc/shreddit/events' \\\n-b reddit_cookies.txt \\\n-H 'Content-Type: text/PLAIN' \\\n-A 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36' \\\n--data-raw '{\"CSRF\":\"'$CSRF_TOKEN'\",\"info\":[{\"source\":\"image\",\"action\":\"trace\",\"noun\":\"performance\",\"client_timestamp\":1755956178186}]}'"
+          }
+        },
+        {
+          "type": "text",
+          "value": "### GraphQL API\n\nThe modern Reddit frontend is heavily reliant on its GraphQL API for data fetching and mutations.\n\n**Endpoint:** `POST /svc/shreddit/graphql`\n\n**Headers:**\n- `Content-Type`: `application/json`\n\n**Body:** The body is a standard GraphQL request, containing an `operation` name, a `variables` object, and the `csrf_token` for authentication. Common operations include `CreateCaptchaToken` for CAPTCHA validation and various content management operations."
+        },
+        {
+          "type": "code_snippet",
+          "languages": {
+            "python": "# Example GraphQL request structure\nimport json\n\n# Assuming 'session' is an authenticated requests.Session object\ncsrf_token = session.cookies.get('csrf_token')\n\n# Example 1: Create CAPTCHA token\ncaptcha_payload = {\n    \"operation\": \"CreateCaptchaToken\",\n    \"variables\": {\n        \"input\": {\n            \"token\": \"0cAFcWeA6_GLbeq...\"\n        }\n    },\n    \"csrf_token\": csrf_token\n}\n\nresponse = session.post(\n    'https://www.reddit.com/svc/shreddit/graphql',\n    headers={'Content-Type': 'application/json'},\n    json=captcha_payload\n)\n\nprint(response.status_code)\nprint(response.json())",
+            "json": "// Example GraphQL request payload structure\n{\n  \"operation\": \"CreateCaptchaToken\",\n  \"variables\": {\n    \"input\": {\n      \"token\": \"0cAFcWeA6yKWGKWaWwzVmOiqyM15yH-gPI0U-KpbW6z35AN1FcND1sfQv0J1UxdSTS5gJa2vW8uAkudcM0LDFEoK_tt__TII-ouKw5prJqI2xXmKvd6qUEugK5OlQ_G\"\n    }\n  },\n  \"csrf_token\": \"9be79e1d90fb05ec6dabde94f7f3cda1\"\n}\n\n// Example response\n{\n  \"data\": {\n    \"createCaptchaToken\": {\n      \"ok\": true\n    }\n  },\n  \"operation\": \"CreateCaptchaToken\",\n  \"duration\": 76.15642499923706,\n  \"errors\": [],\n  \"servedBy\": \"local\"\n}"
+          }
+        },
+        {
+          "type": "text",
+          "value": "### HTML Partials\n\nTo optimize page loads, the interface is broken down into components that are loaded on demand. These are fetched as HTML fragments from the partials service.\n\n**Endpoint:** `GET /svc/shreddit/partial/{PARTIAL_ID}/{PARTIAL_NAME}`\n\n**Example URL:** `/svc/shreddit/partial/J7VVLM/common-left-nav`\n\n**Headers:**\n- `Accept`: `text/vnd.reddit.partial+html, text/html;q=0.9`\n\nThe `PARTIAL_ID` appears to be a dynamic hash that may change with different site builds."
+        },
+        {
+          "type": "code_snippet",
+          "languages": {
+            "cURL": "curl -b reddit_cookies.txt \\\n-H 'Accept: text/vnd.reddit.partial+html, text/html;q=0.9' \\\n'https://www.reddit.com/svc/shreddit/partial/J7VVLM/common-left-nav'"
+          }
+        }
+      ]
+    }
+  ]
+} 

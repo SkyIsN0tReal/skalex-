@@ -1,15 +1,79 @@
 {
-  "sat_overview": "The SAT (Scholastic Assessment Test) is a standardized test widely used for college admissions in the United States.",
-  "sections": {
-    "reading": "Tests reading comprehension and analysis skills",
-    "writing": "Tests grammar, usage, and rhetorical skills", 
-    "math": "Tests algebra, geometry, trigonometry, and data analysis"
-  },
-  "scoring": "Each section scored 200-800, total score 400-1600",
-  "test_tips": [
-    "Read questions carefully",
-    "Eliminate wrong answers",
-    "Manage time effectively",
-    "Practice regularly"
-  ]
-}
+    "pages": [
+      {
+        "title": "Quickstart",
+        "content": [
+          {
+            "type": "text",
+            "value": "This documentation outlines the API for the College Board's SAT Suite Question Bank. It provides access to question metadata, search functionality, and detailed question content. The API is primarily used to power the official web interface for educators."
+          },
+          {
+            "type": "text",
+            "value": "Before accessing the main data endpoints, it is crucial to handle the authentication and anti-bot measures. Please review the 'Authentication' page carefully. The primary data endpoints are hosted on `https://qbank-api.collegeboard.org`."
+          }
+        ]
+      },
+      {
+        "title": "Authentication",
+        "content": [
+          {
+            "type": "text",
+            "value": "The API is protected by Akamai's bot detection service. To interact with the API, you must first acquire a set of valid cookies by simulating an initial visit to the main website. These cookies must be sent with all subsequent requests."
+          },
+          {
+            "type": "text",
+            "value": "1. **Initial Handshake**: Send a GET request to the homepage at `https://satsuitequestionbank.collegeboard.org/`.\n2. **Cookie Jar**: The server will respond with several `Set-Cookie` headers. Your HTTP client must capture and store the values for `ak_bmsc` and `bm_sz`. An `_abck` cookie will also be set and is crucial for passing the bot detection.\n\nNote: The site also employs client-side scripts that make POST requests with `sensor_data` to a dynamically generated path. For many simple API interactions, only the initial set of cookies is needed, but sustained or complex usage may require replicating these sensor calls."
+          },
+          {
+            "type": "code_snippet",
+            "languages": {
+              "python": "import requests\n\n# Use a session object to automatically handle cookies\nsession = requests.Session()\n\n# Standard browser headers are recommended\nheaders = {\n    'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36'\n}\n\n# Make the initial request to get authentication cookies\nurl = 'https://satsuitequestionbank.collegeboard.org/'\nsession.get(url, headers=headers)\n\n# Now the session object contains the necessary cookies for API calls\nprint('Cookies acquired:', session.cookies.get_dict())\n",
+              "cURL": "# Step 1: Make the initial request and save the cookies to a file\ncurl -c cookies.txt 'https://satsuitequestionbank.collegeboard.org/' -H 'User-Agent: Mozilla/5.0'\n\n# Step 2: Use the saved cookies for subsequent API requests\n# Example: curl -b cookies.txt 'https://qbank-api.collegeboard.org/...'"
+            }
+          }
+        ]
+      },
+      {
+        "title": "Endpoints",
+        "content": [
+          {
+            "type": "text",
+            "value": "The core API endpoints provide data for filtering, searching, and retrieving question details."
+          },
+          {
+            "type": "text",
+            "value": "### Get Lookup Data\n\nThis endpoint provides the necessary metadata for building search filters, including available assessments, tests (Reading/Writing, Math), and subject domains.\n\n**Endpoint:** `GET /msreportingquestionbank-prod/questionbank/lookup`"
+          },
+          {
+            "type": "code_snippet",
+            "languages": {
+              "python": "# Assuming 'session' is the authenticated requests.Session() from the Authentication page\n\nlookup_url = 'https://qbank-api.collegeboard.org/msreportingquestionbank-prod/questionbank/lookup'\nresponse = session.get(lookup_url)\n\nif response.status_code == 200:\n    lookup_data = response.json()\n    print(lookup_data)",
+              "cURL": "# Make sure to use the cookies saved from the initial request\ncurl -b cookies.txt 'https://qbank-api.collegeboard.org/msreportingquestionbank-prod/questionbank/lookup'"
+            }
+          },
+          {
+            "type": "text",
+            "value": "### Search for Questions\n\nThis endpoint searches for questions based on criteria obtained from the lookup endpoint.\n\n**Endpoint:** `POST /msreportingquestionbank-prod/questionbank/digital/get-questions`\n\nThe request body must be a JSON object specifying the assessment, test, and domain."
+          },
+          {
+            "type": "code_snippet",
+            "languages": {
+              "python": "# Assuming 'session' is authenticated\n\nsearch_url = 'https://qbank-api.collegeboard.org/msreportingquestionbank-prod/questionbank/digital/get-questions'\n\n# Example payload for SAT -> Math -> Advanced Math\npayload = {\n    \"asmtEventId\": 99, # 99 = SAT\n    \"test\": 2,         # 2 = Math\n    \"domain\": \"P\"       # P = Advanced Math\n}\n\nresponse = session.post(search_url, json=payload)\n\nif response.status_code == 200:\n    questions = response.json()\n    print(f'Found {len(questions)} questions.')",
+              "cURL": "# Use the saved cookies and send a JSON payload\ncurl -b cookies.txt \\\n     -X POST \\\n     -H \"Content-Type: application/json\" \\\n     -d '{\"asmtEventId\":99,\"test\":2,\"domain\":\"P\"}' \\\n     'https://qbank-api.collegeboard.org/msreportingquestionbank-prod/questionbank/digital/get-questions'"
+            }
+          },
+          {
+            "type": "text",
+            "value": "### Get Single Question Details\n\nRetrieve the full content and rationale for a specific question using its `external_id` from the search results.\n\n**Endpoint:** `POST /msreportingquestionbank-prod/questionbank/digital/get-question`"
+          },
+          {
+            "type": "code_snippet",
+            "languages": {
+              "python": "# Assuming 'session' is authenticated\n\ndetail_url = 'https://qbank-api.collegeboard.org/msreportingquestionbank-prod/questionbank/digital/get-question'\n\n# Example external_id from a search result\npayload = {\n    \"external_id\": \"abfd9618-c65d-4fd8-9f89-254e3dfa9529\"\n}\n\nresponse = session.post(detail_url, json=payload)\n\nif response.status_code == 200:\n    question_details = response.json()\n    print(question_details)",
+              "cURL": "# Use the saved cookies and send the external_id as JSON\ncurl -b cookies.txt \\\n     -X POST \\\n     -H \"Content-Type: application/json\" \\\n     -d '{\"external_id\":\"abfd9618-c65d-4fd8-9f89-254e3dfa9529\"}' \\\n     'https://qbank-api.collegeboard.org/msreportingquestionbank-prod/questionbank/digital/get-question'"
+            }
+          }
+        ]
+      }
+    ]
+  }
